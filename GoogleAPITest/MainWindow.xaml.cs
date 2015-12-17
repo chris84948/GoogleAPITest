@@ -7,7 +7,6 @@ using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -23,31 +22,30 @@ namespace GoogleAPITest
     {
         private string[] Scopes = { DriveService.Scope.DriveAppdata };
         private string AppName = "GoogleAPITest";
-        private MemoryDataStore dataStore;
+        private UserCredential credentials;
         
         public MainWindow()
         {
             InitializeComponent();
 
-            dataStore = new MemoryDataStore();
+            string credPath = AppDomain.CurrentDomain.BaseDirectory + AppName;
 
-            string credPath = @"C:\Google Drive\Programming\Google Drive\.credentials\" + AppName;
-            var creds = GetCredentials(credPath, dataStore);
-
-            int i = 0;
+            credentials = GetCredentials(credPath);
         }
 
-        private UserCredential GetCredentials(string credPath, MemoryDataStore dataStore)
+        private UserCredential GetCredentials(string credPath)
         {
             try
             {
-                using (var stream = new FileStream("client_secret.json", FileMode.Open, FileAccess.Read))
+                using (var stream = new System.IO.FileStream("client_secret.json",
+                                                             System.IO.FileMode.Open,
+                                                             System.IO.FileAccess.Read))
                 {
                     return GoogleWebAuthorizationBroker.AuthorizeAsync(stream,
                                                                        Scopes,
                                                                        "user",
                                                                        CancellationToken.None,
-                                                                       dataStore).Result;
+                                                                       new FileDataStore(credPath, true)).Result;
                 }
             }
             catch (AggregateException ae)
@@ -57,6 +55,43 @@ namespace GoogleAPITest
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Insert new file in the Application Data folder.
+        /// </summary>
+        /// <param name="service">Drive API service instance.</param>
+        /// <param name="title">Title of the file to insert, including the extension.</param>
+        /// <param name="description">Description of the file to insert.</param>
+        /// <param name="mimeType">MIME type of the file to insert.</param>
+        /// <param name="filename">Filename of the file to insert.</param>
+        /// <returns>Inserted file metadata, null is returned if an API error occurred.</returns>
+        private File InsertFile(DriveService service, string title, string description, string mimeType, string filename)
+        {
+            // File's metadata.
+            File body = new File();
+            body.Title = title;
+            body.Description = description;
+            body.MimeType = mimeType;
+            body.Parents = new List<ParentReference>() { new ParentReference() { Id = "appfolder" } };
+
+            // File's content.
+            byte[] byteArray = System.IO.File.ReadAllBytes(filename);
+            MemoryStream stream = new MemoryStream(byteArray);
+
+            try
+            {
+                FilesResource.InsertMediaUpload request = service.Files.Insert(body, stream, mimeType);
+                request.Upload();
+
+                File file = request.ResponseBody;
+                return file;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("An error occurred: " + e.Message);
+                return null;
+            }
         }
 
     }
