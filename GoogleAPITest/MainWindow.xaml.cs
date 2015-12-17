@@ -69,7 +69,7 @@ namespace GoogleAPITest
         private File InsertFile(DriveService service, string title, string description, string mimeType, string filename)
         {
             // File's metadata.
-            File body = new File();
+            var body = new File();
             body.Title = title;
             body.Description = description;
             body.MimeType = mimeType;
@@ -81,7 +81,7 @@ namespace GoogleAPITest
 
             try
             {
-                FilesResource.InsertMediaUpload request = service.Files.Insert(body, stream, mimeType);
+                FilesResource.CreateMediaUpload request = service.Files.Create(body, stream, mimeType);
                 request.Upload();
 
                 File file = request.ResponseBody;
