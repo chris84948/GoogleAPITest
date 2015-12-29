@@ -21,6 +21,7 @@
         </Grid.ColumnDefinitions>
 
         <Button x:Name="btnUpload"
+                Click="btnUpload_Click"
                 Grid.Row="0"
                 Grid.Column="0"
                 HorizontalAlignment="Stretch"
@@ -33,7 +34,8 @@
                 VerticalAlignment="Stretch"
                 Content="Download" />
 
-        <TextBox Grid.Row="1"
+        <TextBox x:Name="TextBox"
+                 Grid.Row="1"
                  Grid.ColumnSpan="2"
                  AcceptsReturn="True" />
 

@@ -20,7 +20,7 @@ namespace GoogleAPITest
     /// </summary>
     public partial class MainWindow : Window
     {
-        private string[] Scopes = { DriveService.Scope.DriveAppdata };
+        private string[] Scopes = { DriveService.Scope.DriveFile };
         private string AppName = "GoogleAPITest";
         private UserCredential credentials;
         
@@ -57,41 +57,31 @@ namespace GoogleAPITest
             return null;
         }
 
-        /// <summary>
-        /// Insert new file in the Application Data folder.
-        /// </summary>
-        /// <param name="service">Drive API service instance.</param>
-        /// <param name="title">Title of the file to insert, including the extension.</param>
-        /// <param name="description">Description of the file to insert.</param>
-        /// <param name="mimeType">MIME type of the file to insert.</param>
-        /// <param name="filename">Filename of the file to insert.</param>
-        /// <returns>Inserted file metadata, null is returned if an API error occurred.</returns>
-        private File InsertFile(DriveService service, string title, string description, string mimeType, string filename)
+        private void CreateFile()
         {
-            // File's metadata.
-            var body = new File();
-            body.Title = title;
-            body.Description = description;
-            body.MimeType = mimeType;
-            body.Parents = new List<ParentReference>() { new ParentReference() { Id = "appfolder" } };
+            var driveService = new DriveService();
 
-            // File's content.
-            byte[] byteArray = System.IO.File.ReadAllBytes(filename);
-            MemoryStream stream = new MemoryStream(byteArray);
+            // Upload a new file
+            File body = new File();
+            body.Name = "Test1.txt";
+            body.Description = "Test File";
+            body.MimeType = "text/plain";
+            byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(TextBox.Text);
+            var stream = new System.IO.MemoryStream(byteArray);
+            FilesResource.CreateMediaUpload request = driveService.Files.Create(body, stream, "text/plain");
+            request.Upload();
+            File file = request.ResponseBody;
 
-            try
-            {
-                FilesResource.CreateMediaUpload request = service.Files.Create(body, stream, mimeType);
-                request.Upload();
+            // Show all files
+            var list2 = driveService.Files.List().Execute();
+            if (list2.Files != null)
+                foreach (var fileItem in list2.Files)
+                    Console.WriteLine(fileItem.Name + " - " + fileItem.Description);
+        }
 
-                File file = request.ResponseBody;
-                return file;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("An error occurred: " + e.Message);
-                return null;
-            }
+        private void btnUpload_Click(object sender, RoutedEventArgs e)
+        {
+            CreateFile();
         }
 
     }
