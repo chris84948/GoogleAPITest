@@ -255,7 +255,7 @@ namespace GoogleAPITest
         /// <param name="fileResource">File resource of the file to download</param>
         /// <param name="saveTo">location of where to save the file including the file name to save it as.</param>
         /// <returns></returns>
-        public static void DownloadFile(DriveService service, File fileResource, string saveTo)
+        public void DownloadFile(DriveService service, File fileResource)
         {
             var fileId = fileResource.Id;
             var request = service.Files.Get(fileId);
@@ -276,7 +276,20 @@ namespace GoogleAPITest
                             }
                         case DownloadStatus.Completed:
                             {
-                                Console.WriteLine("Download complete.");
+                                try
+                                {
+                                    Console.WriteLine("Download complete.");
+                                    stream.Position = 0;
+                                    var sr = new System.IO.StreamReader(stream);
+                                    Dispatcher.BeginInvoke((Action) (() =>
+                                    {
+                                        TextBox.Text = sr.ReadToEnd();
+                                    }));
+                                }
+                                catch (Exception ex)
+                                {
+
+                                }
                                 break;
                             }
                         case DownloadStatus.Failed:
@@ -295,6 +308,14 @@ namespace GoogleAPITest
             var file = UploadFile(service, "File1.txt", TextBox.Text, directory.Id);
 
             var allFiles = GetFiles(service, "");
+        }
+
+        private void btnDownload_Click(object sender, RoutedEventArgs e)
+        {
+            var allFiles = GetFiles(service, "");
+            
+            DownloadFile(service, allFiles[0]);
+            
         }
 
     }

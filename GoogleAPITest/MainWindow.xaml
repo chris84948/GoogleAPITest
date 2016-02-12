@@ -30,6 +30,7 @@
         <Button x:Name="btnDownload"
                 Grid.Row="0"
                 Grid.Column="1"
+                Click="btnDownload_Click"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 Content="Download" />
