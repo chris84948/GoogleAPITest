@@ -83,9 +83,9 @@ namespace GoogleAPITest
             {
                 //List all of the files and directories for the current user.  
                 // Documentation: https://developers.google.com/drive/v2/reference/files/list
-                FilesResource.ListRequest list = service.Files.List();
 
                 FilesResource.ListRequest request = service.Files.List();
+                request.Q = "mimeType!='application/vnd.google-apps.folder'";
                 FileList files = request.Execute();
 
                 return files.Files;
@@ -313,6 +313,8 @@ namespace GoogleAPITest
         private void btnDownload_Click(object sender, RoutedEventArgs e)
         {
             var allFiles = GetFiles(service, "");
+
+            Revision revision = service.Revisions.Get(allFiles[0].Id, "").Execute();
             
             DownloadFile(service, allFiles[0]);
             
