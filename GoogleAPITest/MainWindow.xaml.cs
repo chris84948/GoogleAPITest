@@ -79,23 +79,20 @@ namespace GoogleAPITest
 
         public static IList<File> GetFiles(DriveService service, string search)
         {
-            try
-            {
-                //List all of the files and directories for the current user.  
-                // Documentation: https://developers.google.com/drive/v2/reference/files/list
+            FilesResource.ListRequest request = service.Files.List();
+            request.Q = "mimeType!='application/vnd.google-apps.folder'";
+            request.Fields = "files(id,modifiedTime,name,version)";
+            FileList files = request.Execute();
 
-                FilesResource.ListRequest request = service.Files.List();
-                request.Q = "mimeType!='application/vnd.google-apps.folder'";
-                FileList files = request.Execute();
+            return files.Files;
+        }
 
-                return files.Files;
-            }
-            catch (Exception ex)
-            {
-                // In the event there is an error with the request.
-                Console.WriteLine(ex.Message);
-            }
-            return new List<File>();
+        public static File GetFile(DriveService service, string fileID)
+        {
+            var request = service.Files.Get(fileID);
+            File file = request.Execute();
+
+            return file;
         }
 
         /// <summary>
@@ -170,136 +167,30 @@ namespace GoogleAPITest
             }
         }
 
-        /// <summary>
-        /// Updates a file
-        /// Documentation: https://developers.google.com/drive/v2/reference/files/update
-        /// </summary>
-        /// <param name="service">a Valid authenticated DriveService</param>
-        /// <param name="uploadFile">path to the file to upload</param>
-        /// <param name="parent">
-        /// Collection of parent folders which contain this file. 
-        /// Setting this field will put the file in all of the provided folders. root folder.
-        /// </param>
-        /// <param name="fileId">the resource id for the file we would like to update</param>
-        /// <returns>
-        /// If upload succeeded returns the File resource of the uploaded file 
-        /// If the upload fails returns null
-        /// </returns>
-        public static File UpdateFile(DriveService service, string uploadFile, string parent, string fileId)
+        public Task<string> DownloadFile(DriveService service, string fileID)
         {
-            File body = new File();
-            body.Name = System.IO.Path.GetFileName(uploadFile);
-            body.Parents = new List<string>() { parent };
+            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
 
-            // File's content.
-            byte[] byteArray = System.IO.File.ReadAllBytes(uploadFile);
-            System.IO.MemoryStream stream = new System.IO.MemoryStream(byteArray);
-            try
-            {
-                FilesResource.UpdateMediaUpload request = service.Files.Update(body, fileId, stream, String.Empty);
-                request.Upload();
-                return request.ResponseBody;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("An error occurred: " + e.Message);
-                return null;
-            }
-        }
-
-        public static File TrashFile(DriveService service, string uploadFile,  string fileId)
-        {
-            File body = new File();
-            body.Trashed = true;
-
-            // File's content.
-            byte[] byteArray = System.IO.File.ReadAllBytes(uploadFile);
-            System.IO.MemoryStream stream = new System.IO.MemoryStream(byteArray);
-            try
-            {
-                FilesResource.UpdateRequest request = service.Files.Update(body, fileId);
-                return request.Execute();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("An error occurred: " + e.Message);
-                return null;
-            }
-        }
-
-        public static File UntrashFile(DriveService service, string uploadFile, string fileId)
-        {
-            File body = new File();
-            body.Trashed = false;
-
-            // File's content.
-            byte[] byteArray = System.IO.File.ReadAllBytes(uploadFile);
-            System.IO.MemoryStream stream = new System.IO.MemoryStream(byteArray);
-            try
-            {
-                FilesResource.UpdateRequest request = service.Files.Update(body, fileId);
-                return request.Execute();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("An error occurred: " + e.Message);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Download a file
-        /// Documentation: https://developers.google.com/drive/v2/reference/files/get
-        /// </summary>
-        /// <param name="service">a Valid authenticated DriveService</param>
-        /// <param name="fileResource">File resource of the file to download</param>
-        /// <param name="saveTo">location of where to save the file including the file name to save it as.</param>
-        /// <returns></returns>
-        public void DownloadFile(DriveService service, File fileResource)
-        {
-            var fileId = fileResource.Id;
+            var fileId = fileID;
             var request = service.Files.Get(fileId);
             var stream = new System.IO.MemoryStream();
 
-            // Add a handler which will be notified on progress changes.
-            // It will notify on each chunk download and when the
-            // download is completed or failed.
-            request.MediaDownloader.ProgressChanged +=
-                (IDownloadProgress progress) =>
+            request.MediaDownloader.ProgressChanged += progress =>
+            {
+                if (progress.Status == DownloadStatus.Completed)
                 {
-                    switch (progress.Status)
-                    {
-                        case DownloadStatus.Downloading:
-                            {
-                                Console.WriteLine(progress.BytesDownloaded);
-                                break;
-                            }
-                        case DownloadStatus.Completed:
-                            {
-                                try
-                                {
-                                    Console.WriteLine("Download complete.");
-                                    stream.Position = 0;
-                                    var sr = new System.IO.StreamReader(stream);
-                                    Dispatcher.BeginInvoke((Action) (() =>
-                                    {
-                                        TextBox.Text = sr.ReadToEnd();
-                                    }));
-                                }
-                                catch (Exception ex)
-                                {
+                    stream.Position = 0;
+                    tcs.SetResult(new System.IO.StreamReader(stream).ReadToEnd());
+                }
+                else if (progress.Status == DownloadStatus.Failed)
+                {
+                    tcs.SetException(new Exception("File download failed"));
+                }
+            };
 
-                                }
-                                break;
-                            }
-                        case DownloadStatus.Failed:
-                            {
-                                Console.WriteLine("Download failed.");
-                                break;
-                            }
-                    }
-                };
             request.Download(stream);
+
+            return tcs.Task;
         }
 
         private void btnUpload_Click(object sender, RoutedEventArgs e)
@@ -310,14 +201,11 @@ namespace GoogleAPITest
             var allFiles = GetFiles(service, "");
         }
 
-        private void btnDownload_Click(object sender, RoutedEventArgs e)
+        private async void btnDownload_Click(object sender, RoutedEventArgs e)
         {
             var allFiles = GetFiles(service, "");
 
-            Revision revision = service.Revisions.Get(allFiles[0].Id, "").Execute();
-            
-            DownloadFile(service, allFiles[0]);
-            
+            TextBox.Text = await DownloadFile(service, allFiles[0].Id);
         }
 
     }
